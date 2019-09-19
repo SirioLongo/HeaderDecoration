@@ -19,16 +19,35 @@ class MainActivity : AppCompatActivity() {
                 submitList(ContactsStore.getContacts())
             }
             addItemDecoration(
-                HeaderItemDecoration(
-                    object: HeaderItemDecoration.HeaderFactory {
-                        override fun getHeaderView(itemViewType: Int): View {
-                            val v = layoutInflater.inflate(R.layout.layout_section_header, null) as? TextView
-                            v?.text = itemViewType.toChar().toString()
-                            return v?: View(this@MainActivity)
-                        }
-
-                    }
-                ))
+                SectionDecoration(
+                    getDrawable(R.drawable.section_background),
+                    'G'.toInt(),
+                    16,
+                    16,
+                    8,
+                    8
+                )
+//                HeaderItemDecoration(
+//                    object: HeaderItemDecoration.HeaderFactory {
+//                        override fun getHeaderView(itemViewType: Int): View {
+//                            val v = layoutInflater.inflate(R.layout.layout_section_header, null) as? TextView
+//                            v?.text = itemViewType.toChar().toString()
+//                            return v?: View(this@MainActivity)
+//                        }
+//
+//                    }
+//                )
+            )
+            addItemDecoration(
+                SectionDecoration(
+                    getDrawable(R.drawable.section_background),
+                    'A'.toInt(),
+                    16,
+                    16,
+                    8,
+                    8
+                )
+            )
         }
     }
 }

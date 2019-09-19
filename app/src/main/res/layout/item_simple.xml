@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:paddingTop="32dp"
     android:paddingBottom="32dp"
-    android:paddingStart="16dp"
+    android:paddingStart="32dp"
     android:paddingEnd="16dp"
     android:textSize="16sp"
     tools:text="This is an item"
