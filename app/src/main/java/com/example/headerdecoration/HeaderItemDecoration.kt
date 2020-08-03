@@ -1,26 +1,22 @@
 package com.example.headerdecoration
 
 import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.Rect
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
-import kotlin.random.Random
-
 /**
  * Adds a header on top of each section.
  * Sections are detected by itemViewTypes retrieved from the adapter
  * Any cluster of visible contiguous items having the same viewType is considered a section
  */
 class HeaderItemDecoration(
-    val headerFactory: HeaderFactory
+    private val headerFactory: HeaderFactory
 ) : RecyclerView.ItemDecoration() {
 
     // Fixed height for all headers
     // passed to the header view
     // ToDo: wrap content height support
-    val HEADER_HEIGHT = 128
+    val HEADER_HEIGHT = 150
 
     /**
      * Here we find out which of the visible children are first items in their own sections and add
@@ -57,11 +53,15 @@ class HeaderItemDecoration(
 
     override fun onDrawOver(c: Canvas, parent: RecyclerView, state: RecyclerView.State) {
         super.onDrawOver(c, parent, state)
-        val childCount = parent.childCount // Number of visible children
-        // ToDo: avoid repopulating this intire list on every draw call and switch to add/remove population
+        val sectionList = createSectionList(parent)
+        drawHeaders(sectionList, parent, c)
+    }
+
+    private fun createSectionList(parent: RecyclerView): MutableList<Section> {
         val sectionList = mutableListOf<Section>() // List of objects representing visible sections
         // Current section being considered during the loop
         var currentSection: Section? = null
+        val childCount = parent.childCount // Number of visible children
 
         // Loop to create the section list
         for (i in 0 until childCount) {
@@ -107,11 +107,15 @@ class HeaderItemDecoration(
                     }
                 }
             }
-
         }
+        return sectionList
+    }
 
-        // The section list has been populated
-        // for each one, draw a header
+    private fun drawHeaders(
+        sectionList: MutableList<Section>,
+        parent: RecyclerView,
+        c: Canvas
+    ) {
         for (section: Section in sectionList) {
             section.headerView = headerFactory.getHeaderView(section.itemViewType)
             section.startChild?.let { startChild ->
@@ -120,59 +124,83 @@ class HeaderItemDecoration(
                     // ToDo: Move layout() calls outside of every single draw call to lighten the computing load
                     val sectionStart = startChild.top - HEADER_HEIGHT
                     val sectionEnd = endChild.bottom
-                    if(sectionStart <= 0 && sectionEnd >= HEADER_HEIGHT) {
-                        // The section is scrolled beyond the top of the recycler view,
-                        // The end of the section is beyond the height of the section,
-                        // The section is anchored to the top of the recycler view
-                        section.headerView?.apply{
-                            layout(
-                                0,
-                                0,
-                                parent.width,
-                                HEADER_HEIGHT
-                            )
-                            draw(c)
+                    when {
+                        sectionStartsBeyondTheTopWithRoomForHeader(sectionStart, sectionEnd) -> {
+                            // The section header is anchored to the top of the recycler view
+                            section.headerView?.apply {
+                                drawHeaderAtHeight(
+                                    section = section,
+                                    parent = parent,
+                                    canvas = c,
+                                    height = 0f
+                                )
+                            }
                         }
-                    } else if (sectionStart <= 0 && sectionEnd < HEADER_HEIGHT) {
-                        section.headerView?.apply {
-                            // The section is scrolled beyond the top of the recycler view almost entirely,
-                            // there is not enough room for the header to be entirely seen
-                            // The end of the section is closer to the top than the header's height
-                            // The header is only partially visible and anchored to the end of the section
-                            layout(
-                                0,
-                                0,
-                                parent.width,
-                                HEADER_HEIGHT
-                            )
-                            c.save()
-                            c.translate(0f, sectionEnd.toFloat() - HEADER_HEIGHT)
-                            draw(c)
-                            c.restore()
+                        sectionStartsBeyondTheTopWithNoRoomForHeader(sectionStart, sectionEnd) -> {
+                            section.headerView?.apply {
+                                // The header is only partially visible and anchored to the end of the section
+                                drawHeaderAtHeight(
+                                    section = section,
+                                    parent = parent,
+                                    canvas = c,
+                                    height = sectionEnd.toFloat() - HEADER_HEIGHT
+                                )
+                            }
                         }
-                    } else if (sectionStart > 0) {
-                        section.headerView?.apply {
-                            // This section is not the first one in the screen,
+                        sectionIsNotTheFirstVisible(sectionStart) -> {
                             // The header is anchored to the top of the section
-                            layout(
-                                0,
-                                0,
-                                parent.width,
-                                HEADER_HEIGHT
+                            drawHeaderAtHeight(
+                                section = section,
+                                parent = parent,
+                                canvas = c,
+                                height = sectionStart.toFloat()
                             )
-                            c.save()
-                            c.translate(0f, sectionStart.toFloat())
-                            draw(c)
-                            c.restore()
                         }
-                    } else {
+                        else -> {
 
+                        }
                     }
                 }
             }
         }
+    }
 
+    private fun sectionStartsBeyondTheTopWithNoRoomForHeader(
+        sectionStart: Int,
+        sectionEnd: Int
+    ): Boolean {
+        return sectionStart <= 0 && sectionEnd < HEADER_HEIGHT
+    }
 
+    private fun sectionIsNotTheFirstVisible(sectionStart: Int): Boolean {
+        return sectionStart > 0
+    }
+
+    private fun sectionStartsBeyondTheTopWithRoomForHeader(
+        sectionStart: Int,
+        sectionEnd: Int
+    ): Boolean {
+        return sectionStart <= 0 && sectionEnd >= HEADER_HEIGHT
+    }
+
+    private fun drawHeaderAtHeight(
+        section: Section,
+        parent: RecyclerView,
+        canvas: Canvas,
+        height: Float
+    ) {
+        section.headerView?.apply {
+            layout(
+                0,
+                0,
+                parent.width,
+                HEADER_HEIGHT
+            )
+            canvas.save()
+            canvas.translate(0f, height)
+            draw(canvas)
+            canvas.restore()
+        }
     }
 
     /**

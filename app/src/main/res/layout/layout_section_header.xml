@@ -9,5 +9,4 @@
     android:textColor="@android:color/white"
     android:textSize="16sp"
     tools:text="B">
-
 </TextView>
