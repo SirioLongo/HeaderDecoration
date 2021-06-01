@@ -16,7 +16,7 @@ class HeaderItemDecoration(
     // Fixed height for all headers
     // passed to the header view
     // ToDo: wrap content height support
-    val HEADER_HEIGHT = 150
+    val HEADER_HEIGHT = 100
 
     /**
      * Here we find out which of the visible children are first items in their own sections and add
