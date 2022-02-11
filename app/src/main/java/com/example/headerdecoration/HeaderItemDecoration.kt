@@ -2,8 +2,16 @@ package com.example.headerdecoration
 
 import android.graphics.Canvas
 import android.graphics.Rect
+import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
+import android.view.View.MeasureSpec.*
+import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import androidx.recyclerview.widget.RecyclerView
+import java.lang.Integer.min
+
 /**
  * Adds a header on top of each section.
  * Sections are detected by itemViewTypes retrieved from the adapter
@@ -12,11 +20,6 @@ import androidx.recyclerview.widget.RecyclerView
 class HeaderItemDecoration(
     private val headerFactory: HeaderFactory
 ) : RecyclerView.ItemDecoration() {
-
-    // Fixed height for all headers
-    // passed to the header view
-    // ToDo: wrap content height support
-    val HEADER_HEIGHT = 100
 
     /**
      * Here we find out which of the visible children are first items in their own sections and add
@@ -31,11 +34,17 @@ class HeaderItemDecoration(
     ) {
         parent.adapter?.let { adapter ->
             val position = parent.getChildAdapterPosition(view) // The absolute position of the item in the adapter
+            val viewType = parent.adapter?.getItemViewType(position)
             when {
                 position == 0 -> {
                     // The first visible item can be considered the first in its own section
                     // Set the spacing at the top of the item
-                    outRect.top = HEADER_HEIGHT
+                    viewType?.let {
+                        val headerView = headerFactory.getHeaderView(it, LayoutInflater.from(parent.context), parent)
+                        headerView.makeMeasurements(parent)
+                        val targetHeight = headerView.measuredHeight
+                        outRect.top = targetHeight
+                    }
                 }
                 position > 0 -> {
                     // Any other item is considered the first in its own section if the previous has
@@ -43,10 +52,17 @@ class HeaderItemDecoration(
                     val currentItemViewType = adapter.getItemViewType(position)
                     val previousItemViewType = adapter.getItemViewType(position - 1)
                     if (currentItemViewType != previousItemViewType) {
-                        // Set the spacing at the top of the item
-                        outRect.top = HEADER_HEIGHT
+                        viewType?.let {
+                            // Set the spacing at the top of the item
+                            val headerView = headerFactory.getHeaderView(it, LayoutInflater.from(parent.context), parent)
+                            headerView.makeMeasurements(parent)
+                            val targetHeight = headerView.measuredHeight
+                            outRect.top = targetHeight
+                        }
                     }
+                    else {}
                 }
+                else -> {}
             }
         }
     }
@@ -117,15 +133,21 @@ class HeaderItemDecoration(
         c: Canvas
     ) {
         for (section: Section in sectionList) {
-            section.headerView = headerFactory.getHeaderView(section.itemViewType)
+            section.headerView = headerFactory.getHeaderView(section.itemViewType, LayoutInflater.from(parent.context), parent)
+            section.headerView?.makeMeasurements(parent)
+            val headerHeight = section.headerView?.measuredHeight?: 0
             section.startChild?.let { startChild ->
                 section.endChild?.let { endChild ->
                     // If both ends of a section exist, compute the top and bottom of its header and draw it
                     // ToDo: Move layout() calls outside of every single draw call to lighten the computing load
-                    val sectionStart = startChild.top - HEADER_HEIGHT
-                    val sectionEnd = endChild.bottom
+                    val params = startChild.layoutParams as? RecyclerView.LayoutParams
+                    val marginTop = params?.topMargin?: 0
+                    val marginBottom = params?.bottomMargin?: 0
+
+                    val sectionStart = startChild.top - marginTop - headerHeight
+                    val sectionEnd = endChild.bottom + marginBottom
                     when {
-                        sectionStartsBeyondTheTopWithRoomForHeader(sectionStart, sectionEnd) -> {
+                        sectionStartsBeyondTheTopWithRoomForHeader(sectionStart, sectionEnd, headerHeight) -> {
                             // The section header is anchored to the top of the recycler view
                             section.headerView?.apply {
                                 drawHeaderAtHeight(
@@ -136,14 +158,14 @@ class HeaderItemDecoration(
                                 )
                             }
                         }
-                        sectionStartsBeyondTheTopWithNoRoomForHeader(sectionStart, sectionEnd) -> {
+                        sectionStartsBeyondTheTopWithNoRoomForHeader(sectionStart, sectionEnd, headerHeight) -> {
                             section.headerView?.apply {
                                 // The header is only partially visible and anchored to the end of the section
                                 drawHeaderAtHeight(
                                     section = section,
                                     parent = parent,
                                     canvas = c,
-                                    height = sectionEnd.toFloat() - HEADER_HEIGHT
+                                    height = sectionEnd.toFloat() - headerHeight
                                 )
                             }
                         }
@@ -167,9 +189,10 @@ class HeaderItemDecoration(
 
     private fun sectionStartsBeyondTheTopWithNoRoomForHeader(
         sectionStart: Int,
-        sectionEnd: Int
+        sectionEnd: Int,
+        headerHeight: Int
     ): Boolean {
-        return sectionStart <= 0 && sectionEnd < HEADER_HEIGHT
+        return sectionStart <= 0 && sectionEnd < headerHeight
     }
 
     private fun sectionIsNotTheFirstVisible(sectionStart: Int): Boolean {
@@ -178,9 +201,57 @@ class HeaderItemDecoration(
 
     private fun sectionStartsBeyondTheTopWithRoomForHeader(
         sectionStart: Int,
-        sectionEnd: Int
+        sectionEnd: Int,
+        headerHeight: Int
     ): Boolean {
-        return sectionStart <= 0 && sectionEnd >= HEADER_HEIGHT
+        return sectionStart <= 0 && sectionEnd >= headerHeight
+    }
+
+    private fun View.makeMeasurements(
+        parent: RecyclerView
+    ) {
+        val layoutWidth = layoutParams.width
+        val layoutHeight = layoutParams.height
+
+        measure(
+            makeMeasureSpec(0, UNSPECIFIED),
+            makeMeasureSpec(0, UNSPECIFIED)
+        )
+
+        val unconstrainedWidth = measuredWidth
+        val unconstrainedHeight = measuredHeight
+
+        val maxWidth = parent.width
+        val maxHeight = parent.height
+
+        val widthMode = when(layoutWidth) {
+            MATCH_PARENT -> EXACTLY
+            WRAP_CONTENT -> AT_MOST
+            else -> EXACTLY
+        }
+
+        val targetWidth = when(layoutWidth) {
+            MATCH_PARENT -> maxWidth
+            WRAP_CONTENT -> min(maxWidth, unconstrainedWidth)
+            else -> min(maxWidth, layoutWidth)
+        }
+
+        val heightMode = when(layoutHeight) {
+            MATCH_PARENT -> EXACTLY
+            WRAP_CONTENT -> AT_MOST
+            else -> EXACTLY
+        }
+
+        val targetHeight = when(layoutHeight) {
+            MATCH_PARENT -> maxHeight
+            WRAP_CONTENT -> min(maxHeight, unconstrainedHeight)
+            else -> min(maxHeight, layoutHeight)
+        }
+
+        measure(
+            makeMeasureSpec(targetWidth, widthMode),
+            makeMeasureSpec(targetHeight, heightMode)
+        )
     }
 
     private fun drawHeaderAtHeight(
@@ -193,8 +264,8 @@ class HeaderItemDecoration(
             layout(
                 0,
                 0,
-                parent.width,
-                HEADER_HEIGHT
+                measuredWidth,
+                measuredHeight
             )
             canvas.save()
             canvas.translate(0f, height)
@@ -217,6 +288,6 @@ class HeaderItemDecoration(
 
     // This interface is used to provide the view to be drawn as a header for heach item viewType
     interface HeaderFactory {
-        fun getHeaderView(itemViewType: Int): View
+        fun getHeaderView(itemViewType: Int, inflater: LayoutInflater, parent: ViewGroup): View
     }
 }
