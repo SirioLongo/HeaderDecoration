@@ -37,7 +37,7 @@ class HeaderItemDecoration(
             val viewType = parent.adapter?.getItemViewType(position)
             when {
                 position == 0 -> {
-                    // The first visible item can be considered the first in its own section
+                    // The first item in the dataset can be considered the first in its own section
                     // Set the spacing at the top of the item
                     viewType?.let {
                         val headerView = headerFactory.getHeaderView(it, LayoutInflater.from(parent.context), parent)
