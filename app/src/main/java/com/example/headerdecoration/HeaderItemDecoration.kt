@@ -114,8 +114,11 @@ class HeaderItemDecoration(
                             currentSection = section
                             sectionList.add(section)
                         } else {
-                            // this item belongs to the current section
-                            // do nothing
+                            if(i == childCount - 1) {
+                                currentSection?.endChild = child
+                            } else {
+
+                            }
                         }
                     }
                     else -> {
